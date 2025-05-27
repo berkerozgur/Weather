@@ -35,7 +35,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CitiesList(
+private fun CitiesList(
     modifier: Modifier = Modifier
 ) {
     val cities = LocalContext.current.resources.getStringArray(R.array.turkiye_cities)
