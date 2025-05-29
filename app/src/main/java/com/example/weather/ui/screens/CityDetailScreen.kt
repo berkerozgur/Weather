@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.North
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,9 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -33,11 +38,16 @@ import com.example.weather.R
 import com.example.weather.model.WeatherUiModel
 import com.example.weather.ui.WeatherUiState
 import com.example.weather.ui.theme.WeatherTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class WeatherCardData(
     val iconId: Int,
     val title: String,
-    val content: String
+    val content: String,
+    val rotation: Float = 0f,
+    val showDirectionArrow: Boolean = false
 )
 
 @Composable
@@ -60,7 +70,12 @@ fun CityDetailScreen(
 
     when (uiState) {
         is WeatherUiState.Loading -> LoadingScreen(modifier = modifier)
-        is WeatherUiState.Success -> WeatherScreen(uiState.data, modifier = modifier)
+        is WeatherUiState.Success -> WeatherScreen(
+            weather = uiState.data,
+            lastUpdated = uiState.lastUpdated,
+            modifier = modifier
+        )
+
         is WeatherUiState.Error -> ErrorScreen(
             onRetry = onRetry,
             modifier = modifier
@@ -72,18 +87,24 @@ fun CityDetailScreen(
 @Composable
 fun WeatherScreen(
     weather: WeatherUiModel,
+    lastUpdated: Long,
     modifier: Modifier = Modifier
 ) {
+    val formattedTime =
+        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
+            .format(Date(lastUpdated))
     val cityName = weather.cityName
     val temperature = weather.temperature
     val condition = weather.condition
-    val tempRange = weather.tempRange
+    val tempRange = weather.feelsLike
 
     val cards = listOf(
         WeatherCardData(
             R.drawable.air_24px,
             "Wind",
-            weather.windSpeed
+            weather.windSpeed,
+            rotation = (weather.windDeg ?: 0).toFloat(),
+            showDirectionArrow = true
         ),
         WeatherCardData(
             R.drawable.humidity_percentage_24px,
@@ -102,7 +123,7 @@ fun WeatherScreen(
         )
     )
 
-    Column(modifier = modifier.padding(16.dp)) {
+    Column(modifier = modifier.padding(12.dp)) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(
                 text = cityName,
@@ -140,17 +161,26 @@ fun WeatherScreen(
         Spacer(modifier = Modifier.padding(16.dp))
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(cards) { card ->
                 CustomCard(
                     iconId = card.iconId,
                     title = card.title,
-                    content = card.content
+                    content = card.content,
+                    rotation = card.rotation,
+                    showDirectionArrow = card.showDirectionArrow,
                 )
             }
         }
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = "Last updated: $formattedTime",
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.End,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -195,10 +225,15 @@ private fun CustomCard(
     iconId: Int,
     title: String,
     content: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rotation: Float = 0f,
+    showDirectionArrow: Boolean = false,
 ) {
     Card(modifier = modifier) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -210,11 +245,24 @@ private fun CustomCard(
                 )
                 Text(text = title)
             }
-            Text(
-                text = content,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(start = 4.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                if (showDirectionArrow) {
+                    Icon(
+                        imageVector = Icons.Filled.North,
+                        contentDescription = "Wind direction",
+                        modifier = Modifier
+                            .rotate((rotation + 180f) % 360f)
+                            .size(20.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -224,7 +272,7 @@ private fun CustomCard(
 fun CityDetailScreenPreview() {
     WeatherTheme {
         CityDetailScreen(
-            uiState = WeatherUiState.Success(mockWeatherUiModel),
+            uiState = WeatherUiState.Success(mockWeatherUiModel, System.currentTimeMillis()),
             onRetry = {}
         )
     }
@@ -234,11 +282,11 @@ private val mockWeatherUiModel = WeatherUiModel(
     cityName = "İstanbul",
     temperature = "24°",
     condition = "Clear",
-    tempRange = "26° / 20° Feels like 23°",
+    feelsLike = "Feels like 23°",
     pressure = "1012 mb",
     humidity = "60%",
     visibility = "10.0 km",
     windSpeed = "3.5 km/h",
-    windDeg = 0,
+    windDeg = 333,
     icon = "01d"
 )

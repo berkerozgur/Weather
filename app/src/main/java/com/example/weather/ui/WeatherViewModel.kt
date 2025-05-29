@@ -23,7 +23,11 @@ val dotenv = dotenv {
 }
 
 sealed interface WeatherUiState {
-    data class Success(val data: WeatherUiModel) : WeatherUiState
+    data class Success(
+        val data: WeatherUiModel,
+        val lastUpdated: Long
+    ) : WeatherUiState
+
     object Error : WeatherUiState
     object Loading : WeatherUiState
 }
@@ -48,7 +52,8 @@ class WeatherViewModel(
                     lon = selected.lon,
                     apiKey = apiKey
                 )
-                weatherUiState = WeatherUiState.Success(weather.toUiModel())
+                val currentTime = System.currentTimeMillis()
+                weatherUiState = WeatherUiState.Success(weather.toUiModel(), currentTime)
             } catch (e: IOException) {
                 weatherUiState = WeatherUiState.Error
             }
