@@ -1,43 +1,107 @@
 package com.example.weather.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.example.weather.R
+import com.example.weather.model.WeatherUiModel
+import com.example.weather.ui.WeatherUiState
+import com.example.weather.ui.theme.WeatherTheme
 
-// Data model for weather cards
 data class WeatherCardData(
     val iconId: Int,
     val title: String,
     val content: String
 )
 
-// TODO: Replace this with dynamic API response data
-private val sampleWeatherCards = listOf(
-    WeatherCardData(R.drawable.air_24px, "Wind", "3 km/h"),
-    WeatherCardData(R.drawable.humidity_percentage_24px, "Humidity", "80%"),
-    WeatherCardData(R.drawable.visibility_24px, "Visibility", "11.27 km"),
-    WeatherCardData(R.drawable.compress_24px, "Pressure", "1013.5 mb")
-)
-
 @Composable
 fun CityDetailScreen(
-    cityName: String = "Zocca, IT", // TODO: Replace with API data
-    temperature: String = "14°",    // TODO: Replace with API data
-    condition: String = "Clear",    // TODO: Replace with API data
-    tempRange: String = "22° / 10° Feels like 15", // TODO: Replace with API data
-    cards: List<WeatherCardData> = sampleWeatherCards,
+    uiState: WeatherUiState,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState) {
+        if (uiState is WeatherUiState.Success) {
+            val iconUrl = "https://openweathermap.org/img/wn/${uiState.data.icon}@2x.png"
+            val request = ImageRequest.Builder(context)
+                .data(iconUrl)
+                .build()
+            context.imageLoader.enqueue(request)
+        }
+    }
+
+    when (uiState) {
+        is WeatherUiState.Loading -> LoadingScreen(modifier = modifier)
+        is WeatherUiState.Success -> WeatherScreen(uiState.data, modifier = modifier)
+        is WeatherUiState.Error -> ErrorScreen(
+            onRetry = onRetry,
+            modifier = modifier
+        )
+    }
+
+}
+
+@Composable
+fun WeatherScreen(
+    weather: WeatherUiModel,
+    modifier: Modifier = Modifier
+) {
+    val cityName = weather.cityName
+    val temperature = weather.temperature
+    val condition = weather.condition
+    val tempRange = weather.tempRange
+
+    val cards = listOf(
+        WeatherCardData(
+            R.drawable.air_24px,
+            "Wind",
+            weather.windSpeed
+        ),
+        WeatherCardData(
+            R.drawable.humidity_percentage_24px,
+            "Humidity",
+            weather.humidity
+        ),
+        WeatherCardData(
+            R.drawable.visibility_24px,
+            "Visibility",
+            weather.visibility
+        ),
+        WeatherCardData(
+            R.drawable.compress_24px,
+            "Pressure",
+            weather.pressure
+        )
+    )
+
     Column(modifier = modifier.padding(16.dp)) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(
@@ -45,10 +109,22 @@ fun CityDetailScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            Text(
-                text = temperature,
-                style = MaterialTheme.typography.displayLarge,
-            )
+            Row {
+                Text(
+                    text = temperature,
+                    style = MaterialTheme.typography.displayLarge,
+                )
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data("https://openweathermap.org/img/wn/${weather.icon}@2x.png")
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = weather.condition,
+                    placeholder = painterResource(id = R.drawable.image_24px),
+                    error = painterResource(id = R.drawable.broken_image_24px),
+                    modifier = Modifier.size(80.dp)
+                )
+            }
             Text(
                 text = condition,
                 style = MaterialTheme.typography.bodyLarge,
@@ -74,6 +150,42 @@ fun CityDetailScreen(
                     content = card.content
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun LoadingScreen(modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.fillMaxSize()
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+fun ErrorScreen(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.fillMaxSize()
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.error_24px),
+            contentDescription = null,
+            modifier = Modifier.size(128.dp)
+        )
+        Text(
+            text = "Failed to load",
+            style = MaterialTheme.typography.displaySmall,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Button(onClick = onRetry) {
+            Text(text = "Retry")
         }
     }
 }
@@ -110,5 +222,23 @@ private fun CustomCard(
 @Preview(showBackground = true)
 @Composable
 fun CityDetailScreenPreview() {
-    CityDetailScreen()
+    WeatherTheme {
+        CityDetailScreen(
+            uiState = WeatherUiState.Success(mockWeatherUiModel),
+            onRetry = {}
+        )
+    }
 }
+
+private val mockWeatherUiModel = WeatherUiModel(
+    cityName = "İstanbul",
+    temperature = "24°",
+    condition = "Clear",
+    tempRange = "26° / 20° Feels like 23°",
+    pressure = "1012 mb",
+    humidity = "60%",
+    visibility = "10.0 km",
+    windSpeed = "3.5 km/h",
+    windDeg = 0,
+    icon = "01d"
+)
