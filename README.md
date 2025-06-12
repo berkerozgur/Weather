@@ -1,8 +1,8 @@
 # 🌤️ Weather App
 
 A modern Android weather application built with **Kotlin** and **Jetpack Compose**. This app allows
-users to view a list of cities in Türkiye and view its current weather data, using the *
-*openweathermap** API.
+users to view a list of cities in Türkiye and view its current weather data, using the
+**openweathermap** API.
 
 ---
 
